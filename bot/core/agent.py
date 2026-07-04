@@ -96,7 +96,18 @@ class AssistantAgent:
             ),
         )
         initial_response = self.ollama_service.generate(initial_messages)
-        tool_call = self.tool_router.parse_tool_call(initial_response)
+        try:
+            tool_call = self.tool_router.parse_tool_call(initial_response)
+        except ValueError:
+            logger.exception("Tool call parsing failed")
+            return DraftResult(
+                answer=self.response_formatter.format_error_response(
+                    tool_name="unknown",
+                    payload={"error": "Tool call could not be processed."},
+                ),
+                context_messages=initial_messages,
+                final_response=True,
+            )
         logger.info("LLM tool selection result: %s", tool_call)
 
         if tool_call is None:
@@ -148,11 +159,25 @@ class AssistantAgent:
         tool_name: str,
         tool_input: str,
     ) -> DraftResult:
-        tool_output = self.tool_router.execute(
-            tool_name=tool_name,
-            tool_input=tool_input,
-            user_id=user_id,
-        )
+        try:
+            tool_output = self.tool_router.execute(
+                tool_name=tool_name,
+                tool_input=tool_input,
+                user_id=user_id,
+            )
+        except (ValueError, LookupError):
+            logger.exception("Tool execution failed: tool=%s", tool_name)
+            return DraftResult(
+                answer=self.response_formatter.format_error_response(
+                    tool_name=tool_name,
+                    payload={"error": "Tool execution failed."},
+                ),
+                context_messages=[
+                    {"role": "user", "content": current_user_message},
+                ],
+                used_tool=tool_name,
+                final_response=True,
+            )
         logger.info(
             "Serialized tool result: tool=%s output=%s",
             tool_name,
