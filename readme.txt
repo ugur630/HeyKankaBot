@@ -1,27 +1,33 @@
-HeyKankaBot
-
-Production-ready Personal AI Assistant
-
 Features
 
-✓ AI Agent
+Architecture
 
-✓ Long-Term Memory
+Tool Routing
 
-✓ Deterministic Tools
+Reflection
 
-✓ Reflection Layer
+Memory
 
-✓ Background Scheduler
+Scheduler
 
-✓ Reminder System
+Reminder Engine
 
-✓ Weather Notifications
+Voice
 
-✓ Search
+PDF
 
-✓ User Profiles
+Currency
 
-✓ SQLite Persistence
+Weather
 
-✓ Automated Testing
+Search
+
+Testing
+
+59 automated tests
+
+Production-ready architecture
+
+Security hardened
+
+Deterministic tool execution
