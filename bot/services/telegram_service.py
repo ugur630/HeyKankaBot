@@ -16,13 +16,18 @@ from bot.core.response_formatter import ResponseFormatter
 from bot.core.tool_policy import ToolPolicyEngine
 from bot.core.tool_router import ToolRouter
 from bot.database.database import Database
+from bot.handlers.document_handler import handle_pdf_document
 from bot.handlers.message_handler import handle_message, start
+from bot.handlers.voice_handler import handle_voice_message
+from bot.services.currency_service import CurrencyService
 from bot.services.memory_service import MemoryService
 from bot.services.ollama_service import OllamaService
+from bot.services.pdf_service import PdfService
 from bot.services.profile_service import ProfileService
 from bot.services.reminder_parser import ReminderParser
 from bot.services.reminder_service import ReminderService
 from bot.services.search_service import SearchService
+from bot.services.speech_service import SpeechService
 from bot.services.weather_service import WeatherService
 from bot.repositories.reminder_repository import ReminderRepository
 from bot.repositories.user_profile_repository import UserProfileRepository
@@ -58,6 +63,11 @@ def build_application(
         default_city=settings.default_city,
         timeout_seconds=settings.http_timeout_seconds,
     )
+    pdf_service = PdfService(max_chars=settings.pdf_max_chars)
+    speech_service = SpeechService(model_size=settings.whisper_model_size)
+    currency_service = CurrencyService(
+        timeout_seconds=settings.http_timeout_seconds,
+    )
 
     tool_router = ToolRouter(
         build_tool_registry(
@@ -65,6 +75,7 @@ def build_application(
             reminder_service=reminder_service,
             search_service=search_service,
             weather_service=weather_service,
+            currency_service=currency_service,
         )
     )
     context_builder = ContextBuilder(memory_service)
@@ -94,10 +105,18 @@ def build_application(
     application.bot_data["memory_service"] = memory_service
     application.bot_data["agent"] = agent
     application.bot_data["profile_service"] = profile_service
+    application.bot_data["pdf_service"] = pdf_service
+    application.bot_data["speech_service"] = speech_service
 
     application.add_handler(CommandHandler("start", start))
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
+    )
+    application.add_handler(
+        MessageHandler(filters.Document.PDF, handle_pdf_document)
+    )
+    application.add_handler(
+        MessageHandler(filters.VOICE, handle_voice_message)
     )
 
     return application

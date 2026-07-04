@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from bot.services.reminder_parser import ReminderParser
 
@@ -39,6 +39,16 @@ class ReminderParserTests(unittest.TestCase):
 
         self.assertEqual(result.recurrence, "weekly")
         self.assertEqual(result.message, "spor yapmayi")
+
+    def test_strips_greeting_and_question_suffix_from_message(self) -> None:
+        result = self.parser.parse(
+            "Selam kanka bana 1 dakika sonra su icmeyi hatirlatir misin",
+            now=self.now,
+            default_time="09:00",
+        )
+
+        self.assertEqual(result.message, "su icmeyi")
+        self.assertEqual(result.remind_at, self.now + timedelta(minutes=1))
 
 
 if __name__ == "__main__":

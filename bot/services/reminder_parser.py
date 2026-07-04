@@ -28,6 +28,16 @@ REMINDER_KEYWORDS = (
     "remind",
 )
 
+RELATIVE_TIME_PATTERN = re.compile(
+    r"\b(\d+)\s*(saniye|dakika|saat)\s*sonra\b"
+)
+
+RELATIVE_UNIT_TO_KWARG = {
+    "saniye": "seconds",
+    "dakika": "minutes",
+    "saat": "hours",
+}
+
 
 @dataclass(frozen=True)
 class ReminderParseResult:
@@ -46,6 +56,19 @@ class ReminderParser:
     ) -> ReminderParseResult:
         normalized = self._normalize(text)
         recurrence = self._extract_recurrence(normalized)
+
+        relative_delta = self._extract_relative_delta(normalized)
+        if relative_delta is not None:
+            remind_at = now + relative_delta
+            message = self._extract_message(text, normalized)
+            if not message:
+                raise ValueError("Reminder message is empty.")
+            return ReminderParseResult(
+                message=message,
+                remind_at=remind_at,
+                recurrence=recurrence,
+            )
+
         remind_date = self._extract_date(normalized, now)
         remind_time = self._extract_time(normalized) or default_time
         remind_at = self._combine_datetime(remind_date, remind_time)
@@ -83,6 +106,16 @@ class ReminderParser:
 
         return now.date()
 
+    def _extract_relative_delta(self, normalized: str) -> timedelta | None:
+        match = RELATIVE_TIME_PATTERN.search(normalized)
+        if not match:
+            return None
+
+        amount = int(match.group(1))
+        unit = match.group(2)
+        kwarg = RELATIVE_UNIT_TO_KWARG[unit]
+        return timedelta(**{kwarg: amount})
+
     def _extract_time(self, normalized: str) -> str:
         explicit_time = re.search(
             r"\b([01]?\d|2[0-3])[:.]([0-5]\d)\b",
@@ -107,6 +140,11 @@ class ReminderParser:
     def _extract_message(self, original: str, normalized: str) -> str:
         candidate = original.strip()
         candidate = re.sub(
+            r"(?i)\b(selam kanka|kanka selam|merhaba kanka)\b",
+            " ",
+            candidate,
+        )
+        candidate = re.sub(
             r"(?i)\b(bana|beni|lutfen|lütfen)\b",
             " ",
             candidate,
@@ -117,7 +155,22 @@ class ReminderParser:
             candidate,
         )
         candidate = re.sub(
+            r"(?i)\bhat[iı]rlat[a-zçğıöşü]*\b",
+            " ",
+            candidate,
+        )
+        candidate = re.sub(
+            r"(?i)\b(m[iı]s[iı]n|musun|müsün)\b",
+            " ",
+            candidate,
+        )
+        candidate = re.sub(
             r"(?i)\b(yarin|yarın|bugun|bugün)\b",
+            " ",
+            candidate,
+        )
+        candidate = re.sub(
+            r"(?i)\b\d+\s*(saniye|dakika|saat)\s*sonra\b",
             " ",
             candidate,
         )

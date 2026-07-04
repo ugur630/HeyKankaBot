@@ -33,6 +33,8 @@ class Settings:
     feature_reminder_dispatcher_enabled: bool = True
     database_path: Path = DATABASE_PATH
     logs_dir: Path = LOGS_DIR
+    pdf_max_chars: int = 8000
+    whisper_model_size: str = "small"
 
 
 def get_settings() -> Settings:
@@ -70,6 +72,12 @@ def get_settings() -> Settings:
     feature_reminder_dispatcher_enabled = _parse_bool(
         os.getenv("FEATURE_REMINDER_DISPATCHER_ENABLED", "true").strip()
     )
+    pdf_max_chars = int(
+        os.getenv("PDF_MAX_CHARS", "8000").strip() or "8000"
+    )
+    whisper_model_size = (
+        os.getenv("WHISPER_MODEL_SIZE", "small").strip() or "small"
+    )
 
     return Settings(
         telegram_bot_token=token,
@@ -85,6 +93,8 @@ def get_settings() -> Settings:
         job_retry_limit=job_retry_limit,
         feature_morning_weather_enabled=feature_morning_weather_enabled,
         feature_reminder_dispatcher_enabled=feature_reminder_dispatcher_enabled,
+        pdf_max_chars=pdf_max_chars,
+        whisper_model_size=whisper_model_size,
     )
 
 

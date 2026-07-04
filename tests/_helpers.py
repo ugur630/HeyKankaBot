@@ -113,6 +113,19 @@ class FakeWeatherService(WeatherService):
         )
 
 
+class FakeCurrencyService:
+    def extract_currencies(self, query: str) -> tuple[str, str] | None:
+        del query
+        return ("USD", "TRY")
+
+    def get_rate(self, from_currency: str, to_currency: str) -> str:
+        del from_currency, to_currency
+        return (
+            '{"from":"USD","to":"TRY","rate":32.45,'
+            '"date":"2026-07-04","source":"frankfurter"}'
+        )
+
+
 class FakeReminderService:
     def create_reminder(
         self,
@@ -138,6 +151,7 @@ def build_test_agent() -> tuple[AssistantAgent, FakeOllamaService]:
             reminder_service=FakeReminderService(),
             search_service=FakeSearchService(),
             weather_service=FakeWeatherService(),
+            currency_service=FakeCurrencyService(),
         )
     )
     agent = AssistantAgent(

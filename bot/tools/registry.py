@@ -1,12 +1,14 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from bot.services.currency_service import CurrencyService
 from bot.services.memory_service import MemoryService
 from bot.services.reminder_service import ReminderService
 from bot.services.search_service import SearchService
 from bot.services.weather_service import WeatherService
 from bot.tools.calculator import calculate
 from bot.tools.clock import get_current_time
+from bot.tools.currency import get_currency_rate
 from bot.tools.date import get_current_date
 from bot.tools.reminder import create_reminder
 from bot.tools.weather import get_weather
@@ -26,6 +28,7 @@ def build_tool_registry(
     reminder_service: ReminderService,
     search_service: SearchService,
     weather_service: WeatherService,
+    currency_service: CurrencyService,
 ) -> dict[str, ToolDefinition]:
     def clock_tool(query: str, user_id: int | None) -> str:
         del user_id
@@ -42,6 +45,10 @@ def build_tool_registry(
     def weather_tool(query: str, user_id: int | None) -> str:
         del user_id
         return get_weather(query, weather_service)
+
+    def currency_tool(query: str, user_id: int | None) -> str:
+        del user_id
+        return get_currency_rate(query, currency_service)
 
     def reminder_tool(query: str, user_id: int | None) -> str:
         if user_id is None:
@@ -114,6 +121,15 @@ def build_tool_registry(
             description="Returns current weather information for a location.",
             input_hint="Use for weather questions and include the city/location.",
             handler=weather_tool,
+            final_response=True,
+        ),
+        "currency": ToolDefinition(
+            name="currency",
+            description="Returns the current exchange rate between two currencies.",
+            input_hint=(
+                "Use for exchange rate questions like 'dolar kac tl'."
+            ),
+            handler=currency_tool,
             final_response=True,
         ),
         "reminder": ToolDefinition(

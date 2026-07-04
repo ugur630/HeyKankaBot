@@ -38,6 +38,10 @@ class ToolPolicyEngine:
             decision = {"tool": "reminder", "input": user_message}
             return self._log_decision("reminder", decision)
 
+        if self._is_currency_question(normalized):
+            decision = {"tool": "currency", "input": user_message}
+            return self._log_decision("currency", decision)
+
         if self._is_market_question(normalized):
             decision = {"tool": "search_web", "input": user_message}
             return self._log_decision("market", decision)
@@ -89,21 +93,40 @@ class ToolPolicyEngine:
         )
         return any(keyword in normalized for keyword in time_keywords)
 
+    def _is_currency_question(self, normalized: str) -> bool:
+        crypto_keywords = ("btc", "bitcoin", "crypto", "kripto")
+        if any(keyword in normalized for keyword in crypto_keywords):
+            return False
+
+        currency_keywords = (
+            "dolar",
+            "usd",
+            "euro",
+            "avro",
+            "eur",
+            "sterlin",
+            "gbp",
+            "altin",
+            "kur",
+            "lira",
+            "tl",
+        )
+        has_currency_keyword = any(
+            keyword in normalized for keyword in currency_keywords
+        )
+        has_question_marker = (
+            "kac" in normalized or "ne kadar" in normalized
+        )
+        return has_currency_keyword and has_question_marker
+
     def _is_market_question(self, normalized: str) -> bool:
         market_keywords = (
             "btc",
             "bitcoin",
-            "usd",
-            "eur",
-            "gold",
-            "altin",
+            "crypto",
+            "kripto",
             "stock",
             "stocks",
-            "crypto",
-            "exchange rate",
-            "kur",
-            "dolar",
-            "euro",
             "borsa",
             "hisse",
         )

@@ -11,6 +11,7 @@ from bot.utils.logger import logger
 
 SEARCH_PROVIDER = "bing_rss"
 SEARCH_STOPWORDS = {
+    "abi",
     "acaba",
     "ara",
     "arar",
@@ -19,12 +20,14 @@ SEARCH_STOPWORDS = {
     "bir",
     "bu",
     "bul",
+    "dostum",
     "en",
     "gibi",
     "gore",
     "icin",
     "internette",
     "iyi",
+    "kanka",
     "lazim",
     "lutfen",
     "misin",
@@ -37,6 +40,7 @@ SEARCH_STOPWORDS = {
     "onerir misin",
     "onerisi",
     "peki",
+    "reis",
     "rica",
     "sence",
     "soyle",

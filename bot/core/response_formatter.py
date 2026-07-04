@@ -15,6 +15,9 @@ class ResponseFormatter:
         if tool_name == "weather":
             return self.format_weather_response(parsed)
 
+        if tool_name == "currency":
+            return self.format_currency_response(parsed)
+
         if tool_name == "date":
             return self.format_date_response(parsed)
 
@@ -61,6 +64,26 @@ class ResponseFormatter:
             return f"Kanka, {city} icin detayli hava bilgisi su an yok."
 
         return "\n".join(detail_lines)
+
+    def format_currency_response(
+        self,
+        payload: dict[str, object] | None,
+    ) -> str:
+        if not payload:
+            return "Kanka, kur bilgisini su an alamadim."
+
+        from_code = self._string_value(payload, "from")
+        to_code = self._string_value(payload, "to")
+        rate = self._string_value(payload, "rate")
+        date = self._string_value(payload, "date")
+
+        if not (from_code and to_code and rate):
+            return "Kanka, kur bilgisini su an alamadim."
+
+        line = f"Kanka, 1 {from_code} = {rate} {to_code}"
+        if date:
+            line += f" ({date})"
+        return line
 
     def format_search_response(
         self,
@@ -165,7 +188,7 @@ class ResponseFormatter:
         payload: dict[str, object],
     ) -> str:
         error_message = self._string_value(payload, "error")
-        if tool_name == "weather" and error_message:
+        if tool_name in ("weather", "currency") and error_message:
             return f"Kanka, {error_message}"
 
         tool_messages = {
@@ -175,6 +198,7 @@ class ResponseFormatter:
             "calculator": "Kanka, hesabi su an yapamadim.",
             "reminder": "Kanka, hatirlatmayi su an kaydedemedim.",
             "search_web": "Kanka, aramayi su an tamamlayamadim.",
+            "currency": "Kanka, kur bilgisini su an alamadim.",
         }
         return tool_messages.get(
             tool_name,

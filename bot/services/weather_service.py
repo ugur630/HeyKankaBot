@@ -55,15 +55,73 @@ FILLER_WORDS = {
 
 TURKISH_CHAR_MAP = str.maketrans(
     {
-        "\u00e7": "c",
-        "\u011f": "g",
-        "\u0131": "i",
-        "\u00f6": "o",
-        "\u015f": "s",
-        "\u00fc": "u",
-        "\u0130": "I",
+        "ç": "c",
+        "ğ": "g",
+        "ı": "i",
+        "ö": "o",
+        "ş": "s",
+        "ü": "u",
+        "İ": "I",
     }
 )
+
+GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
+FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+
+WMO_WEATHER_DESCRIPTIONS = {
+    0: "Acik",
+    1: "Genelde acik",
+    2: "Parcali bulutlu",
+    3: "Kapali",
+    45: "Sisli",
+    48: "Kiragi sisi",
+    51: "Hafif cisenti",
+    53: "Cisenti",
+    55: "Yogun cisenti",
+    56: "Hafif donan cisenti",
+    57: "Donan cisenti",
+    61: "Hafif yagmurlu",
+    63: "Yagmurlu",
+    65: "Siddetli yagmurlu",
+    66: "Hafif donan yagmur",
+    67: "Donan yagmur",
+    71: "Hafif kar yagisli",
+    73: "Kar yagisli",
+    75: "Yogun kar yagisli",
+    77: "Kar taneli",
+    80: "Hafif saganak yagmurlu",
+    81: "Saganak yagmurlu",
+    82: "Siddetli saganak yagmurlu",
+    85: "Hafif kar saganagi",
+    86: "Yogun kar saganagi",
+    95: "Gok gurultulu firtina",
+    96: "Dolulu gok gurultulu firtina",
+    99: "Siddetli dolulu firtina",
+}
+
+
+def describe_weather_code(weather_code: object) -> str:
+    try:
+        code = int(weather_code)
+    except (TypeError, ValueError):
+        return ""
+
+    if code in WMO_WEATHER_DESCRIPTIONS:
+        return WMO_WEATHER_DESCRIPTIONS[code]
+
+    if 1 <= code <= 3:
+        return "Parcali bulutlu"
+    if code in (45, 48):
+        return "Sisli"
+    if 51 <= code <= 67:
+        return "Yagmurlu"
+    if 71 <= code <= 77:
+        return "Kar yagisli"
+    if 80 <= code <= 82:
+        return "Saganak yagmurlu"
+    if 95 <= code <= 99:
+        return "Firtinali"
+    return ""
 
 
 class WeatherService:
@@ -71,9 +129,11 @@ class WeatherService:
         self,
         default_city: str | None = None,
         timeout_seconds: float = 10.0,
+        transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.default_city = default_city.strip() if default_city else None
         self.timeout_seconds = timeout_seconds
+        self._transport = transport
 
     def get_weather(self, location_query: str) -> str:
         normalized = location_query.strip()
@@ -93,25 +153,29 @@ class WeatherService:
                 }
             )
 
-        url = f"https://wttr.in/{quote_plus(city)}?format=j1"
-        logger.info("Weather URL: %s", url)
-
-        started_at = time.perf_counter()
         try:
             with httpx.Client(
                 follow_redirects=True,
                 timeout=self.timeout_seconds,
                 headers={"User-Agent": "HeyKankaBot/0.7"},
+                transport=self._transport,
             ) as client:
-                response = client.get(url)
-                elapsed_ms = (time.perf_counter() - started_at) * 1000
-                logger.info("HTTP Status: %s", response.status_code)
-                logger.info("Weather response time: %.2f ms", elapsed_ms)
-                logger.info(
-                    "Weather response body (first 300 chars): %s",
-                    response.text[:300],
+                location = self._geocode_city(client, city)
+                if location is None:
+                    return json.dumps(
+                        {
+                            "error": (
+                                f"{city} icin konum bulamadim, sehir "
+                                "adini kontrol edebilir misin?"
+                            ),
+                        }
+                    )
+
+                current = self._fetch_current_weather(
+                    client,
+                    latitude=location["latitude"],
+                    longitude=location["longitude"],
                 )
-                response.raise_for_status()
         except httpx.HTTPError as exc:
             return json.dumps(
                 {
@@ -121,9 +185,6 @@ class WeatherService:
                     ),
                 }
             )
-
-        try:
-            payload = response.json()
         except ValueError:
             return json.dumps(
                 {
@@ -131,24 +192,77 @@ class WeatherService:
                 }
             )
 
-        current = (payload.get("current_condition") or [{}])[0]
-        area = (payload.get("nearest_area") or [{}])[0]
-        weather_desc = (current.get("weatherDesc") or [{}])[0]
-
         result = {
             "city": city,
-            "resolved_area": area.get("areaName", [{}])[0].get(
-                "value", city
-            ),
-            "temperature_c": current.get("temp_C"),
-            "feels_like_c": current.get("FeelsLikeC"),
-            "humidity": current.get("humidity"),
-            "condition": weather_desc.get("value"),
-            "observation_time_utc": current.get("observation_time"),
-            "source": "wttr.in",
+            "resolved_area": location.get("resolved_area") or city,
+            "temperature_c": current.get("temperature_2m"),
+            "feels_like_c": current.get("apparent_temperature"),
+            "humidity": current.get("relative_humidity_2m"),
+            "condition": describe_weather_code(current.get("weather_code")),
+            "observation_time_utc": current.get("time"),
+            "source": "open-meteo",
         }
 
         return json.dumps(result)
+
+    def _geocode_city(
+        self,
+        client: httpx.Client,
+        city: str,
+    ) -> dict[str, object] | None:
+        started_at = time.perf_counter()
+        response = client.get(
+            GEOCODING_URL,
+            params={
+                "name": city,
+                "count": 1,
+                "language": "tr",
+            },
+        )
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        logger.info("Geocoding HTTP status: %s", response.status_code)
+        logger.info("Geocoding response time: %.2f ms", elapsed_ms)
+        response.raise_for_status()
+
+        payload = response.json()
+        results = payload.get("results") or []
+        if not results:
+            return None
+
+        match = results[0]
+        return {
+            "latitude": match["latitude"],
+            "longitude": match["longitude"],
+            "resolved_area": match.get("name"),
+        }
+
+    def _fetch_current_weather(
+        self,
+        client: httpx.Client,
+        *,
+        latitude: float,
+        longitude: float,
+    ) -> dict[str, object]:
+        started_at = time.perf_counter()
+        response = client.get(
+            FORECAST_URL,
+            params={
+                "latitude": latitude,
+                "longitude": longitude,
+                "current": (
+                    "temperature_2m,relative_humidity_2m,"
+                    "apparent_temperature,weather_code"
+                ),
+                "timezone": "auto",
+            },
+        )
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        logger.info("Forecast HTTP status: %s", response.status_code)
+        logger.info("Forecast response time: %.2f ms", elapsed_ms)
+        response.raise_for_status()
+
+        payload = response.json()
+        return payload.get("current") or {}
 
     def extract_city(self, query: str) -> str:
         tokens = self._tokenize(query)
@@ -196,7 +310,7 @@ class WeatherService:
 
     def _tokenize(self, query: str) -> list[dict[str, str]]:
         raw_tokens = re.findall(
-            r"[A-Za-z\u00c0-\u024f\u1e00-\u1eff]+",
+            r"[A-Za-zÀ-ɏḀ-ỿ]+",
             query,
             re.UNICODE,
         )
