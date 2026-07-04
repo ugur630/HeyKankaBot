@@ -51,11 +51,29 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 )
 """
 
+CREATE_MESSAGES_USER_ID_INDEX_SQL = """
+CREATE INDEX IF NOT EXISTS idx_messages_user_id_id
+ON messages (user_id, id)
+"""
+
+CREATE_MEMORIES_USER_ID_INDEX_SQL = """
+CREATE INDEX IF NOT EXISTS idx_memories_user_id_importance_id
+ON memories (user_id, importance, id)
+"""
+
+CREATE_REMINDERS_STATUS_INDEX_SQL = """
+CREATE INDEX IF NOT EXISTS idx_reminders_status_remind_at
+ON reminders (status, remind_at)
+"""
+
 TABLE_SCHEMAS = (
     CREATE_MESSAGES_TABLE_SQL,
     CREATE_MEMORIES_TABLE_SQL,
     CREATE_REMINDERS_TABLE_SQL,
     CREATE_USER_PROFILES_TABLE_SQL,
+    CREATE_MESSAGES_USER_ID_INDEX_SQL,
+    CREATE_MEMORIES_USER_ID_INDEX_SQL,
+    CREATE_REMINDERS_STATUS_INDEX_SQL,
 )
 
 

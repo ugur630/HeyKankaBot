@@ -11,6 +11,7 @@ from telegram.ext import ContextTypes
 from bot.core.agent import AssistantAgent
 from bot.services.memory_service import MemoryService
 from bot.services.pdf_service import PdfService
+from bot.utils.helpers import split_message
 from bot.utils.logger import logger
 
 DEFAULT_PDF_NOTE = "Bu PDF'i ozetle"
@@ -80,7 +81,8 @@ async def handle_pdf_document(
         logger.info("PDF cevabi uretildi.")
         logger.info("%.2f saniye", elapsed)
 
-        await message.reply_text(answer)
+        for chunk in split_message(answer):
+            await message.reply_text(chunk)
     except ValueError as exc:
         logger.exception("PDF text extraction failed")
         await message.reply_text(f"Kanka, PDF'i okuyamadim: {exc}")

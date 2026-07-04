@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from pathlib import Path
 
 
@@ -6,12 +7,12 @@ class Database:
     def __init__(self, db_path: Path) -> None:
         self.db_path = db_path
 
-    def connect(self) -> sqlite3.Connection:
+    def connect(self) -> closing[sqlite3.Connection]:
         connection = sqlite3.connect(self.db_path)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("PRAGMA busy_timeout=5000")
-        return connection
+        return closing(connection)
 
     def create_tables(self) -> None:
         from bot.database.models import TABLE_SCHEMAS

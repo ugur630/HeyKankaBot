@@ -8,6 +8,7 @@ from telegram.ext import ContextTypes
 
 from bot.core.agent import AssistantAgent
 from bot.services.memory_service import MemoryService
+from bot.utils.helpers import split_message
 from bot.utils.logger import logger
 
 
@@ -61,7 +62,8 @@ async def handle_message(
         logger.info("AI cevap uretti.")
         logger.info("%.2f saniye", elapsed)
 
-        await message.reply_text(answer)
+        for chunk in split_message(answer):
+            await message.reply_text(chunk)
     except Exception:
         logger.exception("AI response failed")
         await message.reply_text(

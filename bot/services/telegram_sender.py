@@ -2,6 +2,8 @@ import asyncio
 
 from telegram import Bot
 
+from bot.utils.helpers import split_message
+
 
 class TelegramSender:
     def __init__(self, bot_token: str) -> None:
@@ -12,4 +14,5 @@ class TelegramSender:
 
     async def _send_text(self, chat_id: int, text: str) -> None:
         async with Bot(token=self.bot_token) as bot:
-            await bot.send_message(chat_id=chat_id, text=text)
+            for chunk in split_message(text):
+                await bot.send_message(chat_id=chat_id, text=chunk)

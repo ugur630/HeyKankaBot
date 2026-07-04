@@ -11,6 +11,7 @@ from telegram.ext import ContextTypes
 from bot.core.agent import AssistantAgent
 from bot.services.memory_service import MemoryService
 from bot.services.speech_service import SpeechService
+from bot.utils.helpers import split_message
 from bot.utils.logger import logger
 
 
@@ -53,7 +54,8 @@ async def handle_voice_message(
             partial(speech_service.transcribe, temp_path),
         )
 
-        await message.reply_text(f"\U0001F3A4 Anladigim: {transcript}")
+        for chunk in split_message(f"\U0001F3A4 Anladigim: {transcript}"):
+            await message.reply_text(chunk)
 
         answer = await loop.run_in_executor(
             None,
@@ -72,7 +74,8 @@ async def handle_voice_message(
         logger.info("Sesli mesaj cevabi uretildi.")
         logger.info("%.2f saniye", elapsed)
 
-        await message.reply_text(answer)
+        for chunk in split_message(answer):
+            await message.reply_text(chunk)
     except Exception:
         logger.exception("Voice message handling failed")
         await message.reply_text(
