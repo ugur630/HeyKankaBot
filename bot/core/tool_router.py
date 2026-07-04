@@ -11,6 +11,12 @@ TOOL_CALL_PATTERN = re.compile(
 )
 
 
+def strip_tool_call_markup(text: str) -> str:
+    # Neutralizes injected tool-call syntax in untrusted external content
+    # (PDFs, voice transcripts) before it enters the conversation.
+    return TOOL_CALL_PATTERN.sub("", text)
+
+
 class ToolRouter:
     def __init__(self, registry: dict[str, ToolDefinition]) -> None:
         self.registry = registry

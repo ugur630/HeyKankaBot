@@ -2,6 +2,8 @@ from bot.database.database import Database
 from bot.database import models
 from bot.memory.retriever import SemanticMemoryRetriever
 
+MAX_MEMORY_VALUE_LENGTH = 500
+
 
 class MemoryService:
     def __init__(
@@ -148,14 +150,19 @@ class MemoryService:
             memory_importance = self._map_importance(
                 memory.get("importance", ""),
             )
-            return ("fact", memory_text, memory_importance)
+            return ("fact", self._truncate(memory_text), memory_importance)
 
         if isinstance(memory, str):
-            return ("fact", memory.strip(), importance)
+            return ("fact", self._truncate(memory.strip()), importance)
 
         resolved_key = (key or "fact").strip().lower() or "fact"
-        resolved_value = (value or "").strip()
+        resolved_value = self._truncate((value or "").strip())
         return (resolved_key, resolved_value, importance)
+
+    def _truncate(self, value: str, limit: int = MAX_MEMORY_VALUE_LENGTH) -> str:
+        if len(value) <= limit:
+            return value
+        return value[:limit]
 
     def _map_importance(self, importance: str) -> int:
         normalized = importance.strip().upper()

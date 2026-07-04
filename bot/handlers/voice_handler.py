@@ -9,6 +9,7 @@ from telegram.constants import ChatAction
 from telegram.ext import ContextTypes
 
 from bot.core.agent import AssistantAgent
+from bot.core.tool_router import strip_tool_call_markup
 from bot.services.memory_service import MemoryService
 from bot.services.speech_service import SpeechService
 from bot.utils.helpers import split_message
@@ -49,10 +50,11 @@ async def handle_voice_message(
         await telegram_file.download_to_drive(temp_path)
 
         loop = asyncio.get_running_loop()
-        transcript = await loop.run_in_executor(
+        raw_transcript = await loop.run_in_executor(
             None,
             partial(speech_service.transcribe, temp_path),
         )
+        transcript = strip_tool_call_markup(raw_transcript)
 
         for chunk in split_message(f"\U0001F3A4 Anladigim: {transcript}"):
             await message.reply_text(chunk)
