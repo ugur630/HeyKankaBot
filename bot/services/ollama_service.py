@@ -1,11 +1,7 @@
 import json
-import re
 
 import ollama
 from bot.utils.logger import logger
-
-
-JSON_OBJECT_PATTERN = re.compile(r"\{.*\}", re.DOTALL)
 
 
 class OllamaService:
@@ -37,6 +33,8 @@ class OllamaService:
         messages: list[dict[str, str]],
     ) -> dict[str, object]:
         response = self.generate(messages).strip()
-        match = JSON_OBJECT_PATTERN.search(response)
-        payload = match.group(0) if match else response
-        return json.loads(payload)
+        start = response.find("{")
+        if start == -1:
+            return json.loads(response)
+        payload, _ = json.JSONDecoder().raw_decode(response, start)
+        return payload

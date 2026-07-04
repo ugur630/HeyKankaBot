@@ -1,11 +1,37 @@
+import calendar
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
+from zoneinfo import ZoneInfo
 
 from bot.repositories.reminder_repository import ReminderRepository
 from bot.services.profile_service import ProfileService
 from bot.services.reminder_parser import ReminderParser
 from bot.utils.logger import logger
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _to_utc_naive(local_naive: datetime, tz: ZoneInfo) -> datetime:
+    return local_naive.replace(tzinfo=tz).astimezone(timezone.utc).replace(
+        tzinfo=None
+    )
+
+
+def _to_local_naive(utc_naive: datetime, tz: ZoneInfo) -> datetime:
+    return utc_naive.replace(tzinfo=timezone.utc).astimezone(tz).replace(
+        tzinfo=None
+    )
+
+
+def _add_months(dt: datetime, months: int) -> datetime:
+    total_month_index = dt.month - 1 + months
+    year = dt.year + total_month_index // 12
+    month = total_month_index % 12 + 1
+    day = min(dt.day, calendar.monthrange(year, month)[1])
+    return dt.replace(year=year, month=month, day=day)
 
 
 class ReminderService:
@@ -35,8 +61,9 @@ class ReminderService:
         )
         success = False
         try:
-            current_time = now or datetime.now()
             profile = self.profile_service.get_profile(user_id)
+            tz = ZoneInfo(str(profile["timezone"]) or "UTC")
+            current_time = now or datetime.now(tz).replace(tzinfo=None)
             parsed = self.parser.parse(
                 request_text,
                 now=current_time,
@@ -46,7 +73,7 @@ class ReminderService:
                 user_id=user_id,
                 chat_id=chat_id,
                 message=parsed.message,
-                remind_at=parsed.remind_at,
+                remind_at=_to_utc_naive(parsed.remind_at, tz),
                 recurrence=parsed.recurrence,
                 timezone=str(profile["timezone"]),
             )
@@ -85,7 +112,7 @@ class ReminderService:
         self,
         now: datetime | None = None,
     ) -> list[dict[str, object]]:
-        current_time = now or datetime.now()
+        current_time = now or _utc_now()
         return self.repository.get_due_reminders(current_time)
 
     def complete_or_reschedule(
@@ -94,7 +121,7 @@ class ReminderService:
         *,
         sent_at: datetime | None = None,
     ) -> None:
-        current_time = sent_at or datetime.now()
+        current_time = sent_at or _utc_now()
         recurrence = str(reminder.get("recurrence", "none") or "none")
         reminder_id = int(reminder["id"])
 
@@ -102,13 +129,18 @@ class ReminderService:
             self.repository.mark_completed(reminder_id, current_time)
             return
 
-        next_remind_at = self._calculate_next_occurrence(
-            remind_at=datetime.fromisoformat(str(reminder["remind_at"])),
+        tz = ZoneInfo(str(reminder.get("timezone") or "UTC"))
+        local_remind_at = _to_local_naive(
+            datetime.fromisoformat(str(reminder["remind_at"])),
+            tz,
+        )
+        next_local = self._calculate_next_occurrence(
+            remind_at=local_remind_at,
             recurrence=recurrence,
         )
         self.repository.reschedule(
             reminder_id,
-            next_remind_at=next_remind_at,
+            next_remind_at=_to_utc_naive(next_local, tz),
             sent_at=current_time,
         )
 
@@ -123,7 +155,7 @@ class ReminderService:
         if recurrence == "weekly":
             return remind_at + timedelta(weeks=1)
         if recurrence == "monthly":
-            return remind_at + timedelta(days=30)
+            return _add_months(remind_at, 1)
         if recurrence == "yearly":
-            return remind_at + timedelta(days=365)
+            return _add_months(remind_at, 12)
         return remind_at

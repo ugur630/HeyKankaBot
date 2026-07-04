@@ -51,13 +51,16 @@ class BaseJob(ABC):
         scheduled_hour, scheduled_minute = _parse_notification_time(
             self.notification_time
         )
-        if (
-            current_time.hour != scheduled_hour
-            or current_time.minute != scheduled_minute
-        ):
+        scheduled_today = current_time.replace(
+            hour=scheduled_hour,
+            minute=scheduled_minute,
+            second=0,
+            microsecond=0,
+        )
+        if current_time < scheduled_today:
             return False
 
-        run_key = current_time.strftime("%Y-%m-%d %H:%M")
+        run_key = current_time.strftime("%Y-%m-%d")
         return self._last_run_key != run_key
 
     def execute(self, current_time: datetime | None = None) -> None:
@@ -89,7 +92,7 @@ class BaseJob(ABC):
             )
 
     def mark_ran(self, current_time: datetime) -> None:
-        self._last_run_key = current_time.strftime("%Y-%m-%d %H:%M")
+        self._last_run_key = current_time.strftime("%Y-%m-%d")
 
     @abstractmethod
     def run(self) -> None:

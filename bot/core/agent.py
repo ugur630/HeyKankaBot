@@ -46,14 +46,19 @@ class AssistantAgent:
         user_id: int,
         current_user_message: str,
     ) -> str:
-        self._store_long_term_memory_if_needed(
-            user_id=user_id,
-            current_user_message=current_user_message,
-        )
+        forced_tool = self.tool_policy.decide(current_user_message)
+        logger.info("Router decision: forced_tool=%s", forced_tool)
+
+        if forced_tool is None:
+            self._store_long_term_memory_if_needed(
+                user_id=user_id,
+                current_user_message=current_user_message,
+            )
 
         draft = self._generate_draft(
             user_id=user_id,
             current_user_message=current_user_message,
+            forced_tool=forced_tool,
         )
         return self._reflect_and_finalize(
             user_id=user_id,
@@ -65,9 +70,8 @@ class AssistantAgent:
         self,
         user_id: int,
         current_user_message: str,
+        forced_tool: dict[str, str] | None,
     ) -> DraftResult:
-        forced_tool = self.tool_policy.decide(current_user_message)
-        logger.info("Router decision: forced_tool=%s", forced_tool)
         if forced_tool is not None:
             return self._handle_tool_execution(
                 user_id=user_id,

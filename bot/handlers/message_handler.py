@@ -1,4 +1,6 @@
+import asyncio
 import time
+from functools import partial
 
 from telegram import Update
 from telegram.constants import ChatAction
@@ -41,9 +43,14 @@ async def handle_message(
     start_time = time.time()
 
     try:
-        answer = agent.generate_reply(
-            user_id=user_id,
-            current_user_message=user_message,
+        loop = asyncio.get_running_loop()
+        answer = await loop.run_in_executor(
+            None,
+            partial(
+                agent.generate_reply,
+                user_id=user_id,
+                current_user_message=user_message,
+            ),
         )
         elapsed = time.time() - start_time
 

@@ -1,6 +1,15 @@
+import calendar
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import re
+
+
+def _add_months(dt: datetime, months: int) -> datetime:
+    total_month_index = dt.month - 1 + months
+    year = dt.year + total_month_index // 12
+    month = total_month_index % 12 + 1
+    day = min(dt.day, calendar.monthrange(year, month)[1])
+    return dt.replace(year=year, month=month, day=day)
 
 
 TURKISH_CHAR_MAP = str.maketrans(
@@ -163,9 +172,9 @@ class ReminderParser:
         if recurrence == "weekly":
             return remind_at + timedelta(weeks=1)
         if recurrence == "monthly":
-            return remind_at + timedelta(days=30)
+            return _add_months(remind_at, 1)
         if recurrence == "yearly":
-            return remind_at + timedelta(days=365)
+            return _add_months(remind_at, 12)
         return remind_at
 
     def _normalize(self, value: str) -> str:
